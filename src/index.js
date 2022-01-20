@@ -8,8 +8,11 @@ const matchRepository = require('./MatchRepository');
 
 const logger = require('./Logging').createLogger('Index');
 
-// 30 minutes
-const FETCH_TIMEOUT = 1_000 * 60 * 30;
+// 1 Minute
+const FETCH_TIMEOUT = 1_000 * 60;
+
+const RANKED_QUEUE_ID = 420;
+const FLEX_QUEUE_ID = 440;
 
 const webhookClient = new WebhookClient({
   url: process.env.WEBHOOK_URL,
@@ -25,6 +28,20 @@ function formatNames(names) {
   return names.slice(0, names.length - 1).join(', ') + ' and ' + names[names.length - 1];
 }
 
+function isRankedMatch(match) {
+  const queueId = match.info.queueId;
+  return queueId === FLEX_QUEUE_ID || queueId === RANKED_QUEUE_ID;
+}
+
+function formatRankedTypeName(match) {
+  const queueId = match.info.queueId;
+  if (queueId === FLEX_QUEUE_ID)
+    return 'Flex';
+  if (queueId === RANKED_QUEUE_ID)
+    return 'Solo/Duo';
+  return 'Unbekannter Modul';
+}
+
 async function indexPastMatches() {
   const players = await playerRepository.getPlayers();
   logger.info(`Indexing matches of ${players.length} players`);
@@ -35,7 +52,7 @@ async function indexPastMatches() {
       puuid: player.puuid,
       params: {
         start: 0,
-        count: 5,
+        count: 0,
       },
     });
     for (const matchId of matchHistory)
@@ -53,7 +70,7 @@ async function fetchResults() {
       puuid: player.puuid,
       params: {
         start: 0,
-        count: 5,
+        count: 1,
       },
     });
 
@@ -64,27 +81,29 @@ async function fetchResults() {
           matchId: matchId,
         });
 
-        logger.info(match.info.gameName, match.info.gameType);
+        if (isRankedMatch(match)) {
+          logger.info(match.info.gameName, match.info.gameType);
 
-        const members = match.info.participants.filter(p => players.find(pl => p.puuid === pl.puuid));
-        const win = members[0].win;
-        const names = formatNames(members.map(m => m.summonerName));
+          const members = match.info.participants.filter(p => players.find(pl => p.puuid === pl.puuid));
+          const win = members[0].win;
+          const names = formatNames(members.map(m => m.summonerName));
 
-        const statistics = members.map(m => {
-          return `${m.summonerName}\nPosition: ${m.teamPosition}\nChampion: ${m.championName}\nKDA: ${m.kills}/${m.deaths}/${m.assists}`;
-        }).join('\n\n');
+          const statistics = members.map(m => {
+            return `${m.summonerName}\nPosition: ${m.teamPosition}\nChampion: ${m.championName}\nKDA: ${m.kills}/${m.deaths}/${m.assists}`;
+          }).join('\n\n');
 
-        const embed = new MessageEmbed()
-          .setTitle(names + ' just played a ranked game, and ' + (members.length > 1 ? 'they ' : 'he ') + (win ? 'won' : 'lost'))
-          .setDescription(statistics)
-          .setColor((win ? 'GREEN' : 'RED'));
+          const embed = new MessageEmbed()
+            .setTitle(names + ' just played a ranked ' + formatRankedTypeName(match) + ', and ' + (members.length > 1 ? 'they ' : 'he ') + (win ? 'won! :smile:' : 'lost :frowning:'))
+            .setDescription(statistics)
+            .setColor((win ? 'GREEN' : 'RED'));
 
-        await webhookClient.send({
-          content: 'The leauge journey continues!',
-          username: 'GSV Ranked Ticker',
-          avatarURL: 'https://i.imgur.com/AfFp7pu.png',
-          embeds: [embed],
-        });
+          await webhookClient.send({
+            content: 'The leauge journey continues!',
+            username: 'GSV Ranked Ticker',
+            avatarURL: process.env.AVATAR_URL,
+            embeds: [embed],
+          });
+        }
 
         await matchRepository.addMatch(matchId);
       }
