@@ -1,3 +1,5 @@
+const logger = require('./Logging').createLogger('PlayerRepository');
+
 // TODO replace with a database
 let repository = [];
 
@@ -7,10 +9,9 @@ async function matchExists(matchId) {
 
 async function addMatch(matchId) {
   const exists = await matchExists(matchId);
-  if (exists) {
+  if (exists)
     return;
-  }
-  console.log(`Added match ${matchId}`);
+  logger.info(`Added match ${matchId}`);
   repository = [...repository, matchId];
 }
 

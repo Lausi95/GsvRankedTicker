@@ -1,9 +1,12 @@
 require('dotenv').config();
+
 const { WebhookClient, MessageEmbed } = require('discord.js');
 const { RiotAPI, PlatformId } = require('@fightmegg/riot-api');
 
 const playerRepository = require('./PlayerRepository');
 const matchRepository = require('./MatchRepository');
+
+const logger = require('./Logging').createLogger('Index');
 
 // 30 minutes
 const FETCH_TIMEOUT = 1_000 * 60 * 30;
@@ -15,20 +18,18 @@ const webhookClient = new WebhookClient({
 const rAPI = new RiotAPI(process.env.RIOT_API_KEY);
 
 function formatNames(names) {
-  if (names.length < 2) {
+  if (names.length < 2)
     return names.join('');
-  }
-  if (names.length === 2) {
+  if (names.length === 2)
     return names.join(' and ');
-  }
-  if (names.length > 2) {
-    return names.slice(0, names.length - 1).join(', ') + ' and ' + names[names.length - 1];
-  }
+  return names.slice(0, names.length - 1).join(', ') + ' and ' + names[names.length - 1];
 }
 
 async function indexPastMatches() {
   const players = await playerRepository.getPlayers();
+  logger.info(`Indexing matches of ${players.length} players`);
   for (const player of players) {
+    logger.info(`Indexing matches of ${player.name}`);
     const matchHistory = await rAPI.matchV5.getIdsbyPuuid({
       cluster: PlatformId.EUROPE,
       puuid: player.puuid,
@@ -37,9 +38,8 @@ async function indexPastMatches() {
         count: 5,
       },
     });
-    for (const matchId of matchHistory) {
+    for (const matchId of matchHistory)
       await matchRepository.addMatch(matchId);
-    }
   }
 }
 
@@ -47,7 +47,7 @@ async function fetchResults() {
   const players = await playerRepository.getPlayers();
 
   for (const player of players) {
-    console.log('analyzing player ' + player.name);
+    logger.info(`analyzing player ${player.name}`);
     const matchHistory = await rAPI.matchV5.getIdsbyPuuid({
       cluster: PlatformId.EUROPE,
       puuid: player.puuid,
@@ -64,7 +64,7 @@ async function fetchResults() {
           matchId: matchId,
         });
 
-        console.log(match.info.gameName, match.info.gameType);
+        logger.info(match.info.gameName, match.info.gameType);
 
         const members = match.info.participants.filter(p => players.find(pl => p.puuid === pl.puuid));
         const win = members[0].win;
@@ -95,11 +95,11 @@ async function fetchResults() {
 function loop() {
   fetchResults()
     .then(() => setTimeout(loop, FETCH_TIMEOUT))
-    .catch(console.error);
+    .catch(logger.error);
 }
 
 Promise.all([
   playerRepository.addPlayer('L4usi'),
   playerRepository.addPlayer('FingersHurt'),
   playerRepository.addPlayer('ROOFEEH'),
-]).then(indexPastMatches).then(loop).catch(err => console.error(err));
+]).then(indexPastMatches).then(loop).catch(logger.error);

@@ -1,5 +1,7 @@
 // TODO replace with a database
-const { RiotAPI, PlatformId } = require('@fightmegg/riot-api');
+const { RiotAPI, RiotAPITypes, PlatformId } = require('@fightmegg/riot-api');
+
+const logger = require('./Logging').createLogger('MatchRepository');
 
 let repository = [];
 
@@ -10,17 +12,17 @@ let repository = [];
  */
 async function addPlayer(summonerName) {
   try {
-    console.log(`Adding ${summonerName} to the database...`);
+    logger.info(`Adding ${summonerName} to the database...`);
     const rAPI = new RiotAPI(process.env.RIOT_API_KEY);
     const summoner = await rAPI.summoner.getBySummonerName({
       region: PlatformId.EUW1,
       summonerName: summonerName,
     });
-    console.log(`Player ${summonerName} successfully resolved. PUUID: ${summoner.puuid}`);
+    logger.info(`Player ${summonerName} successfully resolved. PUUID: ${summoner.puuid}`);
     repository = [...repository, summoner];
   }
   catch (err) {
-    console.error(`player ${summonerName} could not be added to the database`);
+    logger.error(`player ${summonerName} could not be added to the database`);
   }
 }
 

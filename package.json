@@ -12,7 +12,8 @@
   "dependencies": {
     "@fightmegg/riot-api": "^0.0.8",
     "discord.js": "^13.6.0",
-    "dotenv": "^14.2.0"
+    "dotenv": "^14.2.0",
+    "winston": "^3.4.0"
   },
   "devDependencies": {
     "eslint": "^8.7.0"
