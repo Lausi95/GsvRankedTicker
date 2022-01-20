@@ -9,19 +9,19 @@ let repository = [];
  * @returns {Promise<void>}
  */
 async function addPlayer(summonerName) {
-	try {
-		console.log(`Adding ${summonerName} to the database...`);
-		const rAPI = new RiotAPI(process.env.RIOT_API_KEY);
-		const summoner = await rAPI.summoner.getBySummonerName({
-			region: PlatformId.EUW1,
-			summonerName: summonerName,
-		});
-		console.log(`Player ${summonerName} successfully resolved. PUUID: ${summoner.puuid}`);
-		repository = [...repository, summoner];
-	}
-	catch (err) {
-		console.error(`player ${summonerName} could not be added to the database`);
-	}
+  try {
+    console.log(`Adding ${summonerName} to the database...`);
+    const rAPI = new RiotAPI(process.env.RIOT_API_KEY);
+    const summoner = await rAPI.summoner.getBySummonerName({
+      region: PlatformId.EUW1,
+      summonerName: summonerName,
+    });
+    console.log(`Player ${summonerName} successfully resolved. PUUID: ${summoner.puuid}`);
+    repository = [...repository, summoner];
+  }
+  catch (err) {
+    console.error(`player ${summonerName} could not be added to the database`);
+  }
 }
 
 /**
@@ -29,18 +29,18 @@ async function addPlayer(summonerName) {
  * @returns {Promise<void>}
  */
 async function removePlayer(summonerName) {
-	repository = repository.filter(p => p.name !== summonerName);
+  repository = repository.filter(p => p.name !== summonerName);
 }
 
 /**
  * @returns {Promise<RiotAPITypes.Summoner.SummonerDTO>}
  */
 async function getPlayers() {
-	return repository;
+  return repository;
 }
 
 module.exports = {
-	addPlayer: addPlayer,
-	removePlayer: removePlayer,
-	getPlayers: getPlayers,
+  addPlayer: addPlayer,
+  removePlayer: removePlayer,
+  getPlayers: getPlayers,
 };
