@@ -52,7 +52,7 @@ async function indexPastMatches() {
       puuid: player.puuid,
       params: {
         start: 0,
-        count: 0,
+        count: 5,
       },
     });
     for (const matchId of matchHistory)
@@ -60,9 +60,21 @@ async function indexPastMatches() {
   }
 }
 
-async function fetchResults() {
-  const players = await playerRepository.getPlayers();
+function formatMembersStatus(members) {
+  return members.map(formatMemberStats).join('\n\n');
+}
 
+function formatMemberStats(m) {
+  return `**${m.summonerName}**\nPosition: ${m.teamPosition}\nChampion: ${m.championName}\nKDA: ${m.kills}/${m.deaths}/${m.assists}`;
+}
+
+function formatTitle(match, members, win) {
+  const names = formatNames(members.map(m => m.summonerName));
+  return names + ' just played a ranked ' + formatRankedTypeName(match) + ', and ' + (members.length > 1 ? 'they ' : 'he ') + (win ? 'won! :smile:' : 'lost :frowning:');
+}
+
+async function fetchLeaugeResults() {
+  const players = await playerRepository.getPlayers();
   for (const player of players) {
     logger.info(`analyzing player ${player.name}`);
     const matchHistory = await rAPI.matchV5.getIdsbyPuuid({
@@ -70,7 +82,7 @@ async function fetchResults() {
       puuid: player.puuid,
       params: {
         start: 0,
-        count: 1,
+        count: 5,
       },
     });
 
@@ -86,15 +98,10 @@ async function fetchResults() {
 
           const members = match.info.participants.filter(p => players.find(pl => p.puuid === pl.puuid));
           const win = members[0].win;
-          const names = formatNames(members.map(m => m.summonerName));
-
-          const statistics = members.map(m => {
-            return `${m.summonerName}\nPosition: ${m.teamPosition}\nChampion: ${m.championName}\nKDA: ${m.kills}/${m.deaths}/${m.assists}`;
-          }).join('\n\n');
 
           const embed = new MessageEmbed()
-            .setTitle(names + ' just played a ranked ' + formatRankedTypeName(match) + ', and ' + (members.length > 1 ? 'they ' : 'he ') + (win ? 'won! :smile:' : 'lost :frowning:'))
-            .setDescription(statistics)
+            .setTitle(formatTitle(match, members, win))
+            .setDescription(formatMembersStatus(members))
             .setColor((win ? 'GREEN' : 'RED'));
 
           await webhookClient.send({
@@ -112,7 +119,7 @@ async function fetchResults() {
 }
 
 function loop() {
-  fetchResults()
+  fetchLeaugeResults()
     .then(() => setTimeout(loop, FETCH_TIMEOUT))
     .catch(logger.error);
 }
