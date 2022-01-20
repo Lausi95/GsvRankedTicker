@@ -1,6 +1,5 @@
-const logger = require('./Logging').createLogger('PlayerRepository');
+const logger = require('./Logging').createLogger('ValorantMatchRepository');
 
-// TODO replace with a database
 let repository = [];
 
 async function matchExists(matchId) {

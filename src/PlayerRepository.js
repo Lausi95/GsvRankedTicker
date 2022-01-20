@@ -1,42 +1,19 @@
-// TODO replace with a database
-const { RiotAPI, RiotAPITypes, PlatformId } = require('@fightmegg/riot-api');
-
-const logger = require('./Logging').createLogger('MatchRepository');
+const logger = require('./Logging').createLogger('PlayerRepository');
 
 let repository = [];
 
-// TODO move player resolving to a different location, since this is only to save the players
-/**
- * @param {string} summonerName
- * @returns {Promise<void>}
- */
-async function addPlayer(summonerName) {
-  try {
-    logger.info(`Adding ${summonerName} to the database...`);
-    const rAPI = new RiotAPI(process.env.RIOT_API_KEY);
-    const summoner = await rAPI.summoner.getBySummonerName({
-      region: PlatformId.EUW1,
-      summonerName: summonerName,
-    });
-    logger.info(`Player ${summonerName} successfully resolved. PUUID: ${summoner.puuid}`);
-    repository = [...repository, summoner];
-  }
-  catch (err) {
-    logger.error(`player ${summonerName} could not be added to the database`);
-  }
+async function addPlayer(player) {
+  if (repository.find(p => p.puuid === player.puuid))
+    return;
+  logger.info(`saving player ${player.puuid}`);
+  repository = [...repository, player];
 }
 
-/**
- * @param {string} summonerName
- * @returns {Promise<void>}
- */
-async function removePlayer(summonerName) {
-  repository = repository.filter(p => p.name !== summonerName);
+async function removePlayer(player) {
+  logger.info(`removing player ${player.puuid}`);
+  repository = repository.filter(p => p !== player);
 }
 
-/**
- * @returns {Promise<RiotAPITypes.Summoner.SummonerDTO>}
- */
 async function getPlayers() {
   return repository;
 }

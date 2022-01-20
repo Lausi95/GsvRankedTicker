@@ -1,10 +1,10 @@
 require('dotenv').config();
 
 const { WebhookClient, MessageEmbed } = require('discord.js');
-const { RiotAPI, PlatformId } = require('@fightmegg/riot-api');
 
 const playerRepository = require('./PlayerRepository');
-const matchRepository = require('./MatchRepository');
+const leaugeMatchRepository = require('./LeaugeMatchRepository');
+const riotAdapter = require('./RiotApiAdapter');
 
 const logger = require('./Logging').createLogger('Index');
 
@@ -18,7 +18,15 @@ const webhookClient = new WebhookClient({
   url: process.env.WEBHOOK_URL,
 });
 
-const rAPI = new RiotAPI(process.env.RIOT_API_KEY);
+async function indexPastLeaugeMatches() {
+  const players = await playerRepository.getPlayers();
+  for (const player of players)
+    await indexMatchesOfPlayer(player);
+}
+
+async function indexMatchesOfPlayer(player) {
+  await riotAdapter.fetchMatchIds(player.puuid).then(leaugeMatchRepository.addMatches);
+}
 
 function formatNames(names) {
   if (names.length < 2)
@@ -42,24 +50,6 @@ function formatRankedTypeName(match) {
   return 'Unbekannter Modul';
 }
 
-async function indexPastMatches() {
-  const players = await playerRepository.getPlayers();
-  logger.info(`Indexing matches of ${players.length} players`);
-  for (const player of players) {
-    logger.info(`Indexing matches of ${player.name}`);
-    const matchHistory = await rAPI.matchV5.getIdsbyPuuid({
-      cluster: PlatformId.EUROPE,
-      puuid: player.puuid,
-      params: {
-        start: 0,
-        count: 5,
-      },
-    });
-    for (const matchId of matchHistory)
-      await matchRepository.addMatch(matchId);
-  }
-}
-
 function formatMembersStatus(members) {
   return members.map(formatMemberStats).join('\n\n');
 }
@@ -77,21 +67,11 @@ async function fetchLeaugeResults() {
   const players = await playerRepository.getPlayers();
   for (const player of players) {
     logger.info(`analyzing player ${player.name}`);
-    const matchHistory = await rAPI.matchV5.getIdsbyPuuid({
-      cluster: PlatformId.EUROPE,
-      puuid: player.puuid,
-      params: {
-        start: 0,
-        count: 5,
-      },
-    });
+    const matchHistory = await riotAdapter.fetchMatchIds(player.puuid);
 
     for (const matchId of matchHistory) {
-      if (!(await matchRepository.matchExists(matchId))) {
-        const match = await rAPI.matchV5.getMatchById({
-          cluster: PlatformId.EUROPE,
-          matchId: matchId,
-        });
+      if (!(await leaugeMatchRepository.matchExists(matchId))) {
+        const match = await riotAdapter.fetchMatch(matchId);
 
         if (isRankedMatch(match)) {
           logger.info(match.info.gameName, match.info.gameType);
@@ -112,7 +92,10 @@ async function fetchLeaugeResults() {
           });
         }
 
-        await matchRepository.addMatch(matchId);
+        await leaugeMatchRepository.addMatch(matchId);
+      }
+      else {
+        logger.info(`match ${matchId} already analyzed`);
       }
     }
   }
@@ -124,8 +107,21 @@ function loop() {
     .catch(logger.error);
 }
 
-Promise.all([
-  playerRepository.addPlayer('L4usi'),
-  playerRepository.addPlayer('FingersHurt'),
-  playerRepository.addPlayer('ROOFEEH'),
-]).then(indexPastMatches).then(loop).catch(logger.error);
+function addPlayer(summonerName) {
+  return riotAdapter.fetchPlayer(summonerName).then(playerRepository.addPlayer);
+}
+
+function addInitialPlayers() {
+  return [
+    addPlayer('L4usi'),
+    addPlayer('russkovski'),
+    addPlayer('ROOFEEH'),
+    addPlayer('FingersHurt'),
+    addPlayer('Midspieler'),
+  ];
+}
+
+Promise.all(addInitialPlayers())
+  .then(indexPastLeaugeMatches)
+  .then(loop)
+  .catch(err => console.dir(err, { depth: 10 }));
