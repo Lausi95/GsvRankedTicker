@@ -50,17 +50,27 @@ function formatRankedTypeName(match) {
   return 'Unbekannter Modul';
 }
 
-function formatMembersStatus(members) {
-  return members.map(formatMemberStats).join('\n\n');
+function formatMembersStatus(match, members) {
+  const time = new Date(match.info.gameStartTimestamp);
+  const duration = Math.round(match.info.gameDuration / 60);
+  return time + '\nDuration: ' + duration + 'min\n\n' + members.map(formatMemberStats).join('\n\n');
 }
 
 function formatMemberStats(m) {
-  return `**${m.summonerName}**\nPosition: ${m.teamPosition}\nChampion: ${m.championName}\nKDA: ${m.kills}/${m.deaths}/${m.assists}`;
+  return `**${m.summonerName}**
+  Position: ${m.teamPosition}
+  Champion: ${m.championName}
+  KDA: ${m.kills}/${m.deaths}/${m.assists}
+  CS: ${m.totalMinionsKilled}`;
 }
 
-function formatTitle(match, members, win) {
+function formatTitle1(match, members, win) {
+  return 'The GSV ranked journey continues!';
+}
+
+function formatTitle2(match, members, win) {
   const names = formatNames(members.map(m => m.summonerName));
-  return names + ' just played a ranked ' + formatRankedTypeName(match) + ', and ' + (members.length > 1 ? 'they ' : 'he ') + (win ? 'won! :smile:' : 'lost :frowning:');
+  return names + ' just played a ranked ' + formatRankedTypeName(match) + ', and ' + (members.length > 1 ? 'they ' : 'he ') + (win ? 'won! <:pog:853266160232431646>' : 'lost <:sadge:934050600696573952>');
 }
 
 async function fetchLeaugeResults() {
@@ -80,12 +90,12 @@ async function fetchLeaugeResults() {
           const win = members[0].win;
 
           const embed = new MessageEmbed()
-            .setTitle(formatTitle(match, members, win))
-            .setDescription(formatMembersStatus(members))
+            .setTitle(formatTitle1(match, members, win))
+            .setDescription(formatMembersStatus(match, members))
             .setColor((win ? 'GREEN' : 'RED'));
 
           await webhookClient.send({
-            content: 'The leauge journey continues!',
+            content: formatTitle2(match, members, win),
             username: 'GSV Ranked Ticker',
             avatarURL: process.env.AVATAR_URL,
             embeds: [embed],

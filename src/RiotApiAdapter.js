@@ -3,7 +3,7 @@ const logger = require('./Logging').createLogger('RiotAdapter');
 
 const riotApi = new RiotAPI(process.env.RIOT_API_KEY);
 
-const MATCH_HISTORY_AMOUNT = 1;
+const MATCH_HISTORY_AMOUNT = 2;
 
 async function fetchMatchIds(puuid) {
   logger.info(`fetch last ${MATCH_HISTORY_AMOUNT} matches of player ${puuid}`);
