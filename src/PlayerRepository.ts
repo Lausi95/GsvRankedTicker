@@ -1,25 +1,21 @@
+import {RiotAPITypes} from "@fightmegg/riot-api";
+
 const logger = require('./Logging').createLogger('PlayerRepository');
 
-let repository = [];
+let repository: RiotAPITypes.Summoner.SummonerDTO[] = [];
 
-async function addPlayer(player) {
+export async function addPlayer(player: RiotAPITypes.Summoner.SummonerDTO) {
   if (repository.find(p => p.puuid === player.puuid))
     return;
   logger.info(`saving player ${player.puuid}`);
   repository = [...repository, player];
 }
 
-async function removePlayer(player) {
+export async function removePlayer(player: RiotAPITypes.Summoner.SummonerDTO) {
   logger.info(`removing player ${player.puuid}`);
   repository = repository.filter(p => p !== player);
 }
 
-async function getPlayers() {
+export async function getPlayers(): Promise<RiotAPITypes.Summoner.SummonerDTO[]> {
   return repository;
 }
-
-module.exports = {
-  addPlayer: addPlayer,
-  removePlayer: removePlayer,
-  getPlayers: getPlayers,
-};

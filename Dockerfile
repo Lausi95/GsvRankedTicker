@@ -3,4 +3,4 @@ FROM node
 ADD . /
 RUN yarn
 
-CMD ["yarn", "start"]
+CMD ["yarn", "buildAndStart"]
