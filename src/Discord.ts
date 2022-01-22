@@ -6,14 +6,9 @@ import {Routes} from "discord-api-types/v9";
 const AVATAR_URL = process.env.AVATAR_URL;
 const BOT_NAME = 'GSV Ranked Ticker';
 
-interface IEmotes {
-  pog: string,
-  sadge: string,
-}
-
 type Color = 'RED' | 'GREEN';
 
-export const Emotes: IEmotes = {
+export const Emotes = {
   pog: '<:pog:853266160232431646>',
   sadge: '<:sadge:934050600696573952>'
 };
