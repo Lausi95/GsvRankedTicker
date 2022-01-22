@@ -5,7 +5,7 @@ const logger = createLogger('RiotAdapter');
 
 const riotApi = new RiotAPI(process.env.RIOT_API_KEY || '');
 
-const MATCH_HISTORY_AMOUNT: number = 2;
+const MATCH_HISTORY_AMOUNT: number = 1;
 
 export async function fetchMatchIds(puuid: string): Promise<string[]> {
   logger.info(`fetch last ${MATCH_HISTORY_AMOUNT} matches of player ${puuid}`);

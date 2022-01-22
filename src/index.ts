@@ -1,31 +1,32 @@
-import {RiotAPITypes} from "@fightmegg/riot-api";
-
 require('dotenv').config();
 
-import { WebhookClient, MessageEmbed } from 'discord.js';
-
+import {RiotAPITypes} from "@fightmegg/riot-api";
 import {createLogger} from "./Logging";
 import * as playerRepository from './PlayerRepository';
 import * as leaugeMatchRepository from './LeaugeMatchRepository';
 import * as riotAdapter from './RiotApiAdapter';
+import * as Discord from './Discord';
 
 const logger = createLogger('Index');
 
-// 1 Minute
-const FETCH_TIMEOUT = 1_000 * 60;
+// 30 sekunden
+const FETCH_TIMEOUT = 1_000 * 30;
 
-const RANKED_QUEUE_ID = 420;
-const FLEX_QUEUE_ID = 440;
-
-const webhookClient = new WebhookClient({
-  url: process.env.WEBHOOK_URL || '',
-});
-
-async function indexPastLeaugeMatches() {
-  const players = await playerRepository.getPlayers();
-  for (const player of players)
-    await indexMatchesOfPlayer(player);
+interface QueueType {
+  id: number,
+  name: string
 }
+
+const QUEUE_TYPES : QueueType[] = [
+  {
+    id: 420,
+    name: 'Ranked'
+  },
+  {
+    id: 440,
+    name: 'Flex'
+  }
+];
 
 async function indexMatchesOfPlayer(player: RiotAPITypes.Summoner.SummonerDTO) {
   await riotAdapter.fetchMatchIds(player.puuid).then(leaugeMatchRepository.addMatches);
@@ -40,17 +41,11 @@ function formatNames(names: string[]) {
 }
 
 function isRankedMatch(match: RiotAPITypes.MatchV5.MatchDTO) {
-  const queueId = match.info.queueId;
-  return queueId === FLEX_QUEUE_ID || queueId === RANKED_QUEUE_ID;
+  return QUEUE_TYPES.find(queueType => queueType.id === match.info.queueId);
 }
 
 function formatRankedTypeName(match: RiotAPITypes.MatchV5.MatchDTO) {
-  const queueId = match.info.queueId;
-  if (queueId === FLEX_QUEUE_ID)
-    return 'Flex';
-  if (queueId === RANKED_QUEUE_ID)
-    return 'Solo/Duo';
-  return 'Unbekannter Modul';
+  return QUEUE_TYPES.find(queueType => queueType.id === match.info.queueId)?.name || 'Unbekannter Modus';
 }
 
 function formatMembersStatus(match: RiotAPITypes.MatchV5.MatchDTO, members: RiotAPITypes.MatchV5.ParticipantDTO[]) {
@@ -73,7 +68,9 @@ function formatTitle1() {
 
 function formatTitle2(match: RiotAPITypes.MatchV5.MatchDTO, members: RiotAPITypes.MatchV5.ParticipantDTO[], win: boolean) {
   const names = formatNames(members.map(m => m.summonerName));
-  return names + ' just played a ranked ' + formatRankedTypeName(match) + ', and ' + (members.length > 1 ? 'they ' : 'he ') + (win ? 'won! <:pog:853266160232431646>' : 'lost <:sadge:934050600696573952>');
+  return names + ' just played a ranked ' + formatRankedTypeName(match)
+    + ', and ' + (members.length > 1 ? 'they ' : 'he ')
+    + (win ? `won! ${Discord.Emotes.pog}` : `lost ${Discord.Emotes.sadge}`);
 }
 
 async function fetchLeaugeResults() {
@@ -92,22 +89,16 @@ async function fetchLeaugeResults() {
           const members = match.info.participants.filter(p => players.find(pl => p.puuid === pl.puuid));
           const win = members[0].win;
 
-          const embed = new MessageEmbed()
-            .setTitle(formatTitle2(match, members, win))
-            .setDescription(formatMembersStatus(match, members))
-            .setColor((win ? 'GREEN' : 'RED'));
-
-          await webhookClient.send({
-            content: formatTitle1(),
-            username: 'GSV Ranked Ticker',
-            avatarURL: process.env.AVATAR_URL,
-            embeds: [embed],
+          await Discord.sendMessage({
+            message: formatTitle1(),
+            title: formatTitle2(match, members, win),
+            body: formatMembersStatus(match, members),
+            color: win ? 'GREEN' : 'RED'
           });
         }
 
         await leaugeMatchRepository.addMatch(matchId);
-      }
-      else {
+      } else {
         logger.info(`match ${matchId} already analyzed`);
       }
     }
@@ -120,21 +111,16 @@ function loop() {
     .catch(logger.error);
 }
 
-function addPlayer(summonerName: string) : Promise<void> {
-  return riotAdapter.fetchPlayer(summonerName).then(playerRepository.addPlayer);
+function addPlayer(summonerName: string): Promise<void> {
+  return riotAdapter.fetchPlayer(summonerName)
+    .then(playerRepository.addPlayer)
+    .then(indexMatchesOfPlayer);
 }
 
-function addInitialPlayers() {
-  return [
-    addPlayer('L4usi'),
-    addPlayer('russkovski'),
-    addPlayer('ROOFEEH'),
-    addPlayer('FingersHurt'),
-    addPlayer('Midspieler'),
-  ];
-}
+Discord.registerCommands().catch(console.error);
+Discord.startBot({
+  onRegisterSummoner: addPlayer,
+  onUnregisterSummoner: playerRepository.removePlayerBySummonerName,
+}).catch(console.error);
 
-Promise.all(addInitialPlayers())
-  .then(indexPastLeaugeMatches)
-  .then(loop)
-  .catch(err => console.dir(err, { depth: 10 }));
+loop();
