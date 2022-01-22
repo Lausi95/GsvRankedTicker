@@ -5,5 +5,5 @@ services:
     build: .
     restart: unless-stopped
     volumes:
-      - "players.json:players.json"
-      - "matches.json:matches.json"
+      - "./players.json:/players.json"
+      - "./matches.json:/matches.json"
