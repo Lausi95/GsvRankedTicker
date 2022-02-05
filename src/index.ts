@@ -1,11 +1,12 @@
-require('dotenv').config();
-
+import * as Discord from "./Discord";
+import {BotInteractionHandlers, Color} from "./Discord";
 import {RiotAPITypes} from "@fightmegg/riot-api";
 import {createLogger} from "./Logging";
 import * as playerRepository from './PlayerRepository';
 import * as leaugeMatchRepository from './LeaugeMatchRepository';
 import * as riotAdapter from './RiotApiAdapter';
-import * as Discord from './Discord';
+
+require('dotenv').config();
 
 const logger = createLogger('Index');
 
@@ -17,7 +18,7 @@ interface QueueType {
   name: string
 }
 
-const QUEUE_TYPES : QueueType[] = [
+const QUEUE_TYPES: QueueType[] = [
   {
     id: 420,
     name: 'Ranked'
@@ -59,7 +60,7 @@ function formatMemberStats(participant: RiotAPITypes.MatchV5.ParticipantDTO) {
   Position: ${participant.teamPosition}
   Champion: ${participant.championName}
   KDA: ${participant.kills}/${participant.deaths}/${participant.assists}
-  CS: ${participant.totalMinionsKilled}`;
+  CS: ${participant.totalMinionsKilled + participant.neutralMinionsKilled}`;
 }
 
 function formatTitle1() {
@@ -89,11 +90,11 @@ async function fetchLeaugeResults() {
           const members = match.info.participants.filter(p => players.find(pl => p.puuid === pl.puuid));
           const win = members[0].win;
 
-          await Discord.sendMessage({
+          await Discord.sendLoLMessage({
             message: formatTitle1(),
             title: formatTitle2(match, members, win),
             body: formatMembersStatus(match, members),
-            color: win ? 'GREEN' : 'RED'
+            color: win ? Color.green : Color.red
           });
         }
 
@@ -108,7 +109,12 @@ async function fetchLeaugeResults() {
 function loop() {
   fetchLeaugeResults()
     .then(() => setTimeout(loop, FETCH_TIMEOUT))
-    .catch(logger.error);
+    .catch(onLoopError);
+}
+
+function onLoopError(err: any) {
+  logger.error(JSON.stringify(err));
+  setTimeout(loop, FETCH_TIMEOUT);
 }
 
 function addPlayer(summonerName: string): Promise<void> {
@@ -117,10 +123,13 @@ function addPlayer(summonerName: string): Promise<void> {
     .then(indexMatchesOfPlayer);
 }
 
-Discord.registerCommands().catch(console.error);
-Discord.startBot({
+const handlers: BotInteractionHandlers = {
   onRegisterSummoner: addPlayer,
   onUnregisterSummoner: playerRepository.removePlayerBySummonerName,
-}).catch(console.error);
+};
+
+Discord.registerCommands()
+  .then(() => Discord.startBot(handlers))
+  .catch(console.error);
 
 loop();
