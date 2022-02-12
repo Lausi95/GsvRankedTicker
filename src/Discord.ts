@@ -20,6 +20,7 @@ export enum Emotes {
   sadge = '<:sadge:934050600696573952>'
 }
 
+log.info(`Discord Webhook URL: ${process.env.LEAUGE_WEBHOOK_URL}`);
 const webhookClient = new Discord.WebhookClient({
   url: process.env.LEAUGE_WEBHOOK_URL || '',
 });
