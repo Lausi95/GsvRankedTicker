@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 import * as Discord from "./Discord";
 import {BotInteractionHandlers, Color} from "./Discord";
 import {RiotAPITypes} from "@fightmegg/riot-api";
@@ -5,8 +7,6 @@ import {createLogger} from "./Logging";
 import * as playerRepository from './PlayerRepository';
 import * as leaugeMatchRepository from './LeaugeMatchRepository';
 import * as riotAdapter from './RiotApiAdapter';
-
-require('dotenv').config();
 
 const logger = createLogger('Index');
 
