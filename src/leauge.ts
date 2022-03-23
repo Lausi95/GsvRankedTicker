@@ -3,6 +3,9 @@ import {createLogger} from "./Logging";
 import {cache} from './cache'
 import dayjs from "dayjs";
 
+dayjs.extend(require('dayjs/plugin/utc'));
+dayjs.extend(require('dayjs/plugin/timezone'));
+
 export namespace league {
 
   const log = createLogger('league');
@@ -128,7 +131,7 @@ export namespace league {
   function mapMatchDtoToMatch(matchDto: RiotAPITypes.MatchV5.MatchDTO): Match {
     return {
       id: matchDto.info.gameId,
-      time: dayjs(matchDto.info.gameStartTimestamp).format('DD.MM.YYYY - HH:mm'),
+      time: dayjs(matchDto.info.gameStartTimestamp, 'Germany/Berlin').format('DD.MM.YYYY - HH:mm'),
       duration: matchDto.info.gameDuration,
       queue: QUEUE_TYPES.find(qt => qt.id === matchDto.info.queueId) || {id: -1, name: '??', isRanked: false},
       afk: !!matchDto.info.participants.find(p => p.teamEarlySurrendered),
