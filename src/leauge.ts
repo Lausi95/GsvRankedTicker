@@ -1,10 +1,11 @@
 import {PlatformId, RiotAPI, RiotAPITypes} from "@fightmegg/riot-api";
 import {createLogger} from "./Logging";
 import {cache} from './cache'
+import dayjs from "dayjs";
 
 export namespace league {
 
-  const log = createLogger('lol adapter');
+  const log = createLogger('league');
 
   let riotApi: RiotAPI;
 
@@ -34,9 +35,10 @@ export namespace league {
 
   export interface Match {
     id: number;
-    time: number;
+    time: string;
     duration: number;
     queue: QueueType;
+    afk: boolean;
     participants: MatchParticipant[];
   }
 
@@ -96,22 +98,6 @@ export namespace league {
     }));
   }
 
-  /**
-   * Find a league player by his/her player id.
-   * @param {number} playerId
-   */
-  async function findPlayerById(playerId: string): Promise<Player> {
-    await initializeApi();
-
-    return riotApi.summoner.getByPUUID({
-      region: PlatformId.EUW1,
-      puuid: playerId
-    }).then(resp => ({
-      id: resp.puuid,
-      name: resp.name,
-    }));
-  }
-
   export async function getLatestMatchesOf(player: Player, amount: number): Promise<Match[]> {
     await initializeApi();
 
@@ -131,7 +117,7 @@ export namespace league {
   }
 
   async function getMatch(matchId: string): Promise<Match> {
-    return cache.getOrResolve<Match>('lolMatch', matchId, () => {
+    return cache.getFromCacheOrResolve<Match>('lolMatch', matchId, () => {
       return riotApi.matchV5.getMatchById({
         matchId: matchId,
         cluster: PlatformId.EUROPE,
@@ -142,9 +128,10 @@ export namespace league {
   function mapMatchDtoToMatch(matchDto: RiotAPITypes.MatchV5.MatchDTO): Match {
     return {
       id: matchDto.info.gameId,
-      time: matchDto.info.gameStartTimestamp,
+      time: dayjs(matchDto.info.gameStartTimestamp).format('DD.MM.YYYY - HH:mm'),
       duration: matchDto.info.gameDuration,
       queue: QUEUE_TYPES.find(qt => qt.id === matchDto.info.queueId) || {id: -1, name: '??', isRanked: false},
+      afk: !!matchDto.info.participants.find(p => p.teamEarlySurrendered),
       participants: matchDto.info.participants.map(p => ({
         playerId: p.puuid,
         summonerName: p.summonerName,
@@ -184,14 +171,16 @@ export namespace league {
   }
 
   export namespace match {
-    let seenMatches: league.Match[] = [];
+    let seenMatches: number[] = [];
 
     export function markAsSeen(match: league.Match) {
-      seenMatches.push(match);
+      if (isMatchSeen(match))
+        return;
+      seenMatches = [...seenMatches, match.id];
     }
 
     export function isMatchSeen(match: league.Match): boolean {
-      return seenMatches.includes(match);
+      return !!seenMatches.find(m => m === match.id);
     }
   }
 }

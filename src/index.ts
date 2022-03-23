@@ -1,34 +1,21 @@
+require('dotenv').config();
+
+import {initializePlayerRepository} from "./PlayerRepository";
 import {league} from "./leauge";
 import * as Discord from "./discord";
 import {BotInteractionHandlers, Color} from "./discord";
 import {createLogger} from "./Logging";
 import * as playerRepository from './PlayerRepository';
 
-require('dotenv').config();
-
 const logger = createLogger('Index');
 
 // 30 sekunden
 const FETCH_TIMEOUT = 1_000 * 30;
-
-interface QueueType {
-  id: number,
-  name: string
-}
-
-const QUEUE_TYPES: QueueType[] = [
-  {
-    id: 420,
-    name: 'Ranked'
-  },
-  {
-    id: 440,
-    name: 'Flex'
-  }
-];
+const MATCH_INDEX_COUNT = 5;
 
 async function indexMatchesOfPlayer(player: league.Player) {
-  league.getLatestMatchesOf(player, 10).then(matches => matches.forEach(match => league.match.markAsSeen(match)));
+  return league.getLatestMatchesOf(player, MATCH_INDEX_COUNT)
+    .then(matches => matches.forEach(match => league.match.markAsSeen(match)));
 }
 
 function formatNames(names: string[]) {
@@ -40,17 +27,17 @@ function formatNames(names: string[]) {
 }
 
 function formatMembersStatus(match: league.Match, members: league.MatchParticipant[]) {
-  const time = new Date(match.time);
+  const time = match.time;
   const duration = Math.round(match.duration / 60);
-  return time + '\nDuration: ' + duration + 'min\n\n' + members.map(formatMemberStats).join('\n\n');
+  return 'Date: ' + time + '\nDuration: ' + duration + 'min\n\n' + members.map(formatMemberStats).join('\n\n');
 }
 
 function formatMemberStats(participant: league.MatchParticipant) {
   return `**${participant.summonerName}**
   Position: ${participant.position}
   Champion: ${participant.champion}
-  KDA: ${participant.kills}/${participant.deaths}/${participant.assists}
-  CS: ${participant.cs}`;
+  KDA:      ${participant.kills}/${participant.deaths}/${participant.assists}
+  CS:       ${participant.cs}`;
 }
 
 function formatTitle1() {
@@ -68,11 +55,11 @@ async function fetchLeaugeResults() {
   const players = await playerRepository.getPlayers();
   for (const player of players) {
     logger.info(`analyzing player ${player.name}`);
-    const matches = await league.getLatestMatchesOf(player, 10);
+    const matches = await league.getLatestMatchesOf(player, MATCH_INDEX_COUNT);
 
     for (const match of matches) {
       if (!league.match.isMatchSeen(match)) {
-        if (match.queue.isRanked) {
+        if (match.queue.isRanked && !match.afk) {
           const members = match.participants.filter(p => players.find(pl => p.playerId === pl.id));
           const win = members[0].win;
 
@@ -88,24 +75,28 @@ async function fetchLeaugeResults() {
   }
 }
 
-async function initialize(resolve: (value: (PromiseLike<void> | void)) => void): Promise<void> {
+async function initializeMatchWatcher(resolve: (value: (PromiseLike<void> | void)) => void): Promise<void> {
   try {
-
+    logger.info('Initializing...');
+    await initializePlayerRepository();
+    const players = await playerRepository.getPlayers();
+    for (const player of players) {
+      await indexMatchesOfPlayer(player);
+    }
+    logger.info('Initializing done.');
     resolve();
   } catch {
-    setTimeout(() => initialize(resolve), 10_000);
+    setTimeout(() => initializeMatchWatcher(resolve), 10_000);
   }
 }
 
-function loop() {
+function checkMatchesLoop() {
   fetchLeaugeResults()
-    .then(() => setTimeout(loop, FETCH_TIMEOUT))
-    .catch(onLoopError);
-}
-
-function onLoopError(err: any) {
-  logger.error(JSON.stringify(err));
-  setTimeout(loop, FETCH_TIMEOUT);
+    .then(() => setTimeout(checkMatchesLoop, FETCH_TIMEOUT))
+    .catch((err) => {
+      logger.error(JSON.stringify(err));
+      setTimeout(checkMatchesLoop, FETCH_TIMEOUT);
+    });
 }
 
 async function addPlayer(summonerName: string): Promise<void> {
@@ -123,4 +114,6 @@ Discord.registerCommands()
   .then(() => Discord.startBot(handlers))
   .catch(console.error);
 
-loop();
+new Promise((resolve) => initializeMatchWatcher(resolve))
+  .then(checkMatchesLoop)
+  .catch(err => logger.error(JSON.stringify(err)));

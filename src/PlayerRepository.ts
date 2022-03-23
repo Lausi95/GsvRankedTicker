@@ -11,12 +11,20 @@ if (!fs.existsSync(FILE_NAME)) {
 }
 
 let repository: league.Player[] = [];
-fs.readFile(FILE_NAME, 'utf8', (err, data) => {
-  if (err)
-    return;
-  repository = JSON.parse(data);
-  log.info("Loaded players from file")
-});
+
+export async function initializePlayerRepository(): Promise<void> {
+  return new Promise((resolve) => tryInitializePlayerRepository(resolve));
+}
+
+async function tryInitializePlayerRepository(resolve: { (value: void | PromiseLike<void>): void; (): void; }) {
+  fs.readFile(FILE_NAME, 'utf8', (err, data) => {
+    if (err)
+      return;
+    repository = JSON.parse(data);
+    log.info("Loaded players from file");
+    resolve();
+  });
+}
 
 export async function addPlayer(player: league.Player): Promise<league.Player> {
   if (repository.find(p => p.id === player.id))
