@@ -12,6 +12,7 @@ export namespace cache {
       if (redisClient)
         return;
 
+      log.info('initializing cache');
       redisClient = createClient();
       redisClient.on('error', (err: any) => log.error(JSON.stringify(err)));
 
