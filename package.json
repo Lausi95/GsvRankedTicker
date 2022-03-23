@@ -15,9 +15,11 @@
     "@discordjs/builders": "^0.11.0",
     "@discordjs/rest": "^0.2.0-canary.0",
     "@fightmegg/riot-api": "^0.0.8",
+    "@types/redis": "^4.0.11",
     "discord-api-types": "^0.26.1",
     "discord.js": "^13.6.0",
     "dotenv": "^14.2.0",
+    "redis": "^4.0.4",
     "winston": "^3.4.0"
   },
   "devDependencies": {

@@ -4,6 +4,11 @@ services:
   gsv:
     build: .
     restart: unless-stopped
+
     volumes:
       - "./players.json:/players.json"
       - "./matches.json:/matches.json"
+  redis:
+    image: redislabs/redis
+    ports:
+      - "6379:6379"

@@ -1,12 +1,10 @@
-require('dotenv').config();
-
-import * as Discord from "./Discord";
-import {BotInteractionHandlers, Color} from "./Discord";
-import {RiotAPITypes} from "@fightmegg/riot-api";
+import {league} from "./leauge";
+import * as Discord from "./discord";
+import {BotInteractionHandlers, Color} from "./discord";
 import {createLogger} from "./Logging";
 import * as playerRepository from './PlayerRepository';
-import * as leaugeMatchRepository from './LeaugeMatchRepository';
-import * as riotAdapter from './RiotApiAdapter';
+
+require('dotenv').config();
 
 const logger = createLogger('Index');
 
@@ -29,8 +27,8 @@ const QUEUE_TYPES: QueueType[] = [
   }
 ];
 
-async function indexMatchesOfPlayer(player: RiotAPITypes.Summoner.SummonerDTO) {
-  await riotAdapter.fetchMatchIds(player.puuid).then(leaugeMatchRepository.addMatches);
+async function indexMatchesOfPlayer(player: league.Player) {
+  league.getLatestMatchesOf(player, 10).then(matches => matches.forEach(match => league.match.markAsSeen(match)));
 }
 
 function formatNames(names: string[]) {
@@ -41,35 +39,27 @@ function formatNames(names: string[]) {
   return names.slice(0, names.length - 1).join(', ') + ' and ' + names[names.length - 1];
 }
 
-function isRankedMatch(match: RiotAPITypes.MatchV5.MatchDTO) {
-  return QUEUE_TYPES.find(queueType => queueType.id === match.info.queueId);
-}
-
-function formatRankedTypeName(match: RiotAPITypes.MatchV5.MatchDTO) {
-  return QUEUE_TYPES.find(queueType => queueType.id === match.info.queueId)?.name || 'Unbekannter Modus';
-}
-
-function formatMembersStatus(match: RiotAPITypes.MatchV5.MatchDTO, members: RiotAPITypes.MatchV5.ParticipantDTO[]) {
-  const time = new Date(match.info.gameStartTimestamp);
-  const duration = Math.round(match.info.gameDuration / 60);
+function formatMembersStatus(match: league.Match, members: league.MatchParticipant[]) {
+  const time = new Date(match.time);
+  const duration = Math.round(match.duration / 60);
   return time + '\nDuration: ' + duration + 'min\n\n' + members.map(formatMemberStats).join('\n\n');
 }
 
-function formatMemberStats(participant: RiotAPITypes.MatchV5.ParticipantDTO) {
+function formatMemberStats(participant: league.MatchParticipant) {
   return `**${participant.summonerName}**
-  Position: ${participant.teamPosition}
-  Champion: ${participant.championName}
+  Position: ${participant.position}
+  Champion: ${participant.champion}
   KDA: ${participant.kills}/${participant.deaths}/${participant.assists}
-  CS: ${participant.totalMinionsKilled + participant.neutralMinionsKilled}`;
+  CS: ${participant.cs}`;
 }
 
 function formatTitle1() {
   return 'The GSV ranked journey continues!';
 }
 
-function formatTitle2(match: RiotAPITypes.MatchV5.MatchDTO, members: RiotAPITypes.MatchV5.ParticipantDTO[], win: boolean) {
+function formatTitle2(match: league.Match, members: league.MatchParticipant[], win: boolean) {
   const names = formatNames(members.map(m => m.summonerName));
-  return names + ' just played a ranked ' + formatRankedTypeName(match)
+  return names + ' just played a ranked ' + match.queue.name
     + ', and ' + (members.length > 1 ? 'they ' : 'he ')
     + (win ? `won! ${Discord.Emotes.pog}` : `lost ${Discord.Emotes.sadge}`);
 }
@@ -78,16 +68,12 @@ async function fetchLeaugeResults() {
   const players = await playerRepository.getPlayers();
   for (const player of players) {
     logger.info(`analyzing player ${player.name}`);
-    const matchHistory = await riotAdapter.fetchMatchIds(player.puuid);
+    const matches = await league.getLatestMatchesOf(player, 10);
 
-    for (const matchId of matchHistory) {
-      if (!(await leaugeMatchRepository.matchExists(matchId))) {
-        const match = await riotAdapter.fetchMatch(matchId);
-
-        if (isRankedMatch(match)) {
-          logger.info(match.info.gameName, match.info.gameType);
-
-          const members = match.info.participants.filter(p => players.find(pl => p.puuid === pl.puuid));
+    for (const match of matches) {
+      if (!league.match.isMatchSeen(match)) {
+        if (match.queue.isRanked) {
+          const members = match.participants.filter(p => players.find(pl => p.playerId === pl.id));
           const win = members[0].win;
 
           await Discord.sendLoLMessage({
@@ -97,12 +83,17 @@ async function fetchLeaugeResults() {
             color: win ? Color.green : Color.red
           });
         }
-
-        await leaugeMatchRepository.addMatch(matchId);
-      } else {
-        logger.info(`match ${matchId} already analyzed`);
       }
     }
+  }
+}
+
+async function initialize(resolve: (value: (PromiseLike<void> | void)) => void): Promise<void> {
+  try {
+
+    resolve();
+  } catch {
+    setTimeout(() => initialize(resolve), 10_000);
   }
 }
 
@@ -117,9 +108,9 @@ function onLoopError(err: any) {
   setTimeout(loop, FETCH_TIMEOUT);
 }
 
-function addPlayer(summonerName: string): Promise<void> {
-  return riotAdapter.fetchPlayer(summonerName)
-    .then(playerRepository.addPlayer)
+async function addPlayer(summonerName: string): Promise<void> {
+  league.findPlayerBySummonerName(summonerName)
+    .then((player) => playerRepository.addPlayer(player))
     .then(indexMatchesOfPlayer);
 }
 
