@@ -71,6 +71,7 @@ async function fetchLeaugeResults() {
           });
         }
       }
+      league.match.markAsSeen(match);
     }
   }
 }
