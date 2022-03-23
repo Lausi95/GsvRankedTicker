@@ -13,7 +13,9 @@ export namespace cache {
         return;
 
       log.info('initializing cache');
-      redisClient = createClient();
+      redisClient = createClient({
+        url: process.env.REDIS_HOST || 'redis://localhost:6379',
+      });
       redisClient.on('error', (err: any) => log.error(JSON.stringify(err)));
 
       return redisClient.connect().then(() => log.info('redis connected'));
