@@ -85,7 +85,8 @@ async function initializeMatchWatcher(resolve: (value: (PromiseLike<void> | void
     }
     logger.info('Initializing done.');
     resolve();
-  } catch {
+  } catch (err) {
+    logger.info(`Failed to ini: ${JSON.stringify(err)}`);
     setTimeout(() => initializeMatchWatcher(resolve), 10_000);
   }
 }

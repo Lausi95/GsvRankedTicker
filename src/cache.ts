@@ -7,7 +7,7 @@ export namespace cache {
 
   let redisClient: RedisClientType;
 
-  async function connect(): Promise<void> {
+  async function connect(): Promise<unknown> {
     try {
       if (redisClient)
         return;
@@ -15,7 +15,7 @@ export namespace cache {
       redisClient = createClient();
       redisClient.on('error', (err: any) => log.error(JSON.stringify(err)));
 
-      return redisClient.connect();
+      return redisClient.connect().then(() => log.info('redis connected'));
     } catch {
       log.error('cannot connect to redis');
     }
