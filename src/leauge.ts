@@ -1,5 +1,5 @@
 import {PlatformId, RiotAPI, RiotAPITypes} from "@fightmegg/riot-api";
-import {createLogger} from "./Logging";
+import {logging} from "./Logging";
 import {cache} from './cache'
 import dayjs from "dayjs";
 
@@ -8,7 +8,7 @@ dayjs.extend(require('dayjs/plugin/timezone'));
 
 export namespace league {
 
-  const log = createLogger('league');
+  const log = logging.createLogger('league');
 
   let riotApi: RiotAPI;
 
@@ -74,13 +74,10 @@ export namespace league {
     UNDEFINED = '???',
   }
 
-  async function initializeApi() {
-    if (riotApi)
-      return;
-
+  export async function initialize() {
+    log.info('Initializing leauge api...');
     if (!process.env.RIOT_API_KEY)
       throw 'Riot API-Key not configured!';
-
     riotApi = new RiotAPI(process.env.RIOT_API_KEY);
   }
 
@@ -89,8 +86,6 @@ export namespace league {
    * @param {string} summonerName
    */
   export async function findPlayerBySummonerName(summonerName: string): Promise<Player> {
-    await initializeApi();
-
     log.info(`Resolving player with summoner name ${summonerName}`);
     return riotApi.summoner.getBySummonerName({
       region: PlatformId.EUW1,
@@ -102,8 +97,6 @@ export namespace league {
   }
 
   export async function getLatestMatchesOf(player: Player, amount: number): Promise<Match[]> {
-    await initializeApi();
-
     const matchIds = await getLatestMatchIdsOf(player, amount);
     return await Promise.all(matchIds.map(getMatch));
   }

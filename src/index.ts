@@ -1,13 +1,12 @@
+import {cache} from "./cache";
+import {playerRepository} from "./PlayerRepository";
+import {league} from "./leauge";
+import {discord} from "./discord";
+import {logging} from "./Logging";
+
 require('dotenv').config();
 
-import {initializePlayerRepository} from "./PlayerRepository";
-import {league} from "./leauge";
-import * as Discord from "./discord";
-import {BotInteractionHandlers, Color} from "./discord";
-import {createLogger} from "./Logging";
-import * as playerRepository from './PlayerRepository';
-
-const logger = createLogger('Index');
+const log = logging.createLogger('main');
 
 // 30 sekunden
 const FETCH_TIMEOUT = 1_000 * 30;
@@ -16,6 +15,50 @@ const MATCH_INDEX_COUNT = 5;
 async function indexMatchesOfPlayer(player: league.Player) {
   return league.getLatestMatchesOf(player, MATCH_INDEX_COUNT)
     .then(matches => matches.forEach(match => league.match.markAsSeen(match)));
+}
+
+async function analyseMatchesOfAllPlayers() {
+  const players = await playerRepository.getPlayers();
+  for (const player of players)
+    await analyseMatchesOfPlayer(player, players);
+}
+
+async function analyseMatchesOfPlayer(player: league.Player, players: league.Player[]) {
+  const matches = await league.getLatestMatchesOf(player, MATCH_INDEX_COUNT);
+  for (const match of matches)
+    await analyseMatch(match, players);
+}
+
+async function analyseMatch(match: league.Match, players: league.Player[]) {
+  if (shouldPostMatch(match))
+    await postMatch(match, players);
+  league.match.markAsSeen(match);
+}
+
+function shouldPostMatch(match: league.Match): boolean {
+  return !league.match.isMatchSeen(match) && match.queue.isRanked && !match.afk;
+}
+
+async function postMatch(match: league.Match, players: league.Player[]) {
+  const members = match.participants.filter(p => players.find(pl => p.playerId === pl.id));
+  const win = members[0].win;
+  await discord.sendMessage({
+    message: formatTitle1(),
+    title: formatTitle2(match, members, win),
+    body: formatMembersStatus(match, members),
+    color: win ? discord.Color.green : discord.Color.red,
+  });
+}
+
+function formatTitle1() {
+  return 'The GSV ranked journey continues!';
+}
+
+function formatTitle2(match: league.Match, members: league.MatchParticipant[], win: boolean) {
+  const names = formatNames(members.map(m => m.summonerName));
+  return names + ' just played a ranked ' + match.queue.name
+    + ', and ' + (members.length > 1 ? 'they ' : 'he ')
+    + (win ? `won! ${discord.Emotes.pog}` : `lost ${discord.Emotes.sadge}`);
 }
 
 function formatNames(names: string[]) {
@@ -29,7 +72,7 @@ function formatNames(names: string[]) {
 function formatMembersStatus(match: league.Match, members: league.MatchParticipant[]) {
   const time = match.time;
   const duration = Math.round(match.duration / 60);
-  return 'Date: ' + time + '\nDuration: ' + duration + 'min\n\n' + members.map(formatMemberStats).join('\n\n');
+  return `Date: ${time}\nDuration: ${duration}min\n\n${members.map(formatMemberStats).join('\n\n')}`;
 }
 
 function formatMemberStats(participant: league.MatchParticipant) {
@@ -40,82 +83,41 @@ function formatMemberStats(participant: league.MatchParticipant) {
   CS:       ${participant.cs}`;
 }
 
-function formatTitle1() {
-  return 'The GSV ranked journey continues!';
-}
-
-function formatTitle2(match: league.Match, members: league.MatchParticipant[], win: boolean) {
-  const names = formatNames(members.map(m => m.summonerName));
-  return names + ' just played a ranked ' + match.queue.name
-    + ', and ' + (members.length > 1 ? 'they ' : 'he ')
-    + (win ? `won! ${Discord.Emotes.pog}` : `lost ${Discord.Emotes.sadge}`);
-}
-
-async function fetchLeaugeResults() {
-  const players = await playerRepository.getPlayers();
-  for (const player of players) {
-    logger.info(`analyzing player ${player.name}`);
-    const matches = await league.getLatestMatchesOf(player, MATCH_INDEX_COUNT);
-
-    for (const match of matches) {
-      if (!league.match.isMatchSeen(match)) {
-        if (match.queue.isRanked && !match.afk) {
-          const members = match.participants.filter(p => players.find(pl => p.playerId === pl.id));
-          const win = members[0].win;
-
-          await Discord.sendLoLMessage({
-            message: formatTitle1(),
-            title: formatTitle2(match, members, win),
-            body: formatMembersStatus(match, members),
-            color: win ? Color.green : Color.red
-          });
-        }
-      }
-      league.match.markAsSeen(match);
-    }
-  }
-}
-
-async function initializeMatchWatcher(resolve: (value: (PromiseLike<void> | void)) => void): Promise<void> {
-  try {
-    logger.info('Initializing...');
-    await initializePlayerRepository();
-    const players = await playerRepository.getPlayers();
-    for (const player of players) {
-      await indexMatchesOfPlayer(player);
-    }
-    logger.info('Initializing done.');
-    resolve();
-  } catch (err) {
-    logger.info(`Failed to ini: ${JSON.stringify(err)}`);
-    setTimeout(() => initializeMatchWatcher(resolve), 10_000);
-  }
-}
-
 function checkMatchesLoop() {
-  fetchLeaugeResults()
+  analyseMatchesOfAllPlayers()
     .then(() => setTimeout(checkMatchesLoop, FETCH_TIMEOUT))
     .catch((err) => {
-      logger.error(JSON.stringify(err));
+      log.error(JSON.stringify(err));
       setTimeout(checkMatchesLoop, FETCH_TIMEOUT);
     });
 }
 
 async function addPlayer(summonerName: string): Promise<void> {
   league.findPlayerBySummonerName(summonerName)
-    .then((player) => playerRepository.addPlayer(player))
+    .then(playerRepository.addPlayer)
     .then(indexMatchesOfPlayer);
 }
 
-const handlers: BotInteractionHandlers = {
+const handlers: discord.BotInteractionHandlers = {
   onRegisterSummoner: addPlayer,
   onUnregisterSummoner: playerRepository.removePlayerBySummonerName,
 };
 
-Discord.registerCommands()
-  .then(() => Discord.startBot(handlers))
-  .catch(console.error);
+async function initialize(): Promise<void> {
+  await playerRepository.initialize()
+  await discord.initialize(handlers);
+  await cache.initialize();
+  await league.initialize();
+  log.info('Initialization done.');
+}
 
-new Promise((resolve) => initializeMatchWatcher(resolve))
+async function premarkRecentMatches(): Promise<void> {
+  const players = await playerRepository.getPlayers();
+  for (const player of players)
+    await indexMatchesOfPlayer(player);
+}
+
+initialize()
+  .then(premarkRecentMatches)
   .then(checkMatchesLoop)
-  .catch(err => logger.error(JSON.stringify(err)));
+  .catch(err => log.error(JSON.stringify(err)));
