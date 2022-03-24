@@ -20,6 +20,8 @@
     "discord-api-types": "^0.26.1",
     "discord.js": "^13.6.0",
     "dotenv": "^14.2.0",
+    "moment": "^2.29.1",
+    "moment-timezone": "^0.5.34",
     "redis": "^4.0.4",
     "winston": "^3.4.0"
   },

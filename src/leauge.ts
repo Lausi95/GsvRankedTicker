@@ -1,10 +1,11 @@
 import {PlatformId, RiotAPI, RiotAPITypes} from "@fightmegg/riot-api";
 import {logging} from "./Logging";
 import {cache} from './cache'
-import dayjs from "dayjs";
 
-dayjs.extend(require('dayjs/plugin/utc'));
-dayjs.extend(require('dayjs/plugin/timezone'));
+import moment from 'moment-timezone';
+import 'moment/locale/de';
+
+moment.locale('de');
 
 export namespace league {
 
@@ -124,7 +125,7 @@ export namespace league {
   function mapMatchDtoToMatch(matchDto: RiotAPITypes.MatchV5.MatchDTO): Match {
     return {
       id: matchDto.info.gameId,
-      time: dayjs(matchDto.info.gameStartTimestamp, 'Germany/Berlin').format('DD.MM.YYYY - HH:mm'),
+      time: moment(matchDto.info.gameStartTimestamp).tz('Europe/Berlin').format('DD.MM.YYYY HH:mm'),
       duration: matchDto.info.gameDuration,
       queue: QUEUE_TYPES.find(qt => qt.id === matchDto.info.queueId) || {id: -1, name: '??', isRanked: false},
       afk: !!matchDto.info.participants.find(p => p.teamEarlySurrendered),

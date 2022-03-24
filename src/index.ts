@@ -1,16 +1,16 @@
+require('dotenv').config();
+
 import {cache} from "./cache";
 import {playerRepository} from "./PlayerRepository";
 import {league} from "./leauge";
 import {discord} from "./discord";
 import {logging} from "./Logging";
 
-require('dotenv').config();
-
 const log = logging.createLogger('main');
 
 // 30 sekunden
-const FETCH_TIMEOUT = 1_000 * 30;
-const MATCH_INDEX_COUNT = 5;
+const FETCH_TIMEOUT = 1_000 * 1;
+const MATCH_INDEX_COUNT = 1;
 
 async function indexMatchesOfPlayer(player: league.Player) {
   return league.getLatestMatchesOf(player, MATCH_INDEX_COUNT)
@@ -118,6 +118,6 @@ async function premarkRecentMatches(): Promise<void> {
 }
 
 initialize()
-  .then(premarkRecentMatches)
+  // .then(premarkRecentMatches)
   .then(checkMatchesLoop)
   .catch(err => log.error(JSON.stringify(err)));
