@@ -9,7 +9,7 @@ import {logging} from "./Logging";
 const log = logging.createLogger('main');
 
 // 30 sekunden
-const FETCH_TIMEOUT = 1_000 * 1;
+const FETCH_TIMEOUT = 1_000 * 30;
 const MATCH_INDEX_COUNT = 1;
 
 async function indexMatchesOfPlayer(player: league.Player) {
@@ -118,6 +118,6 @@ async function premarkRecentMatches(): Promise<void> {
 }
 
 initialize()
-  // .then(premarkRecentMatches)
+  .then(premarkRecentMatches)
   .then(checkMatchesLoop)
   .catch(err => log.error(JSON.stringify(err)));
