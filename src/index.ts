@@ -42,11 +42,13 @@ function shouldPostMatch(match: league.Match): boolean {
 async function postMatch(match: league.Match, players: league.Player[]) {
   const members = match.participants.filter(p => players.find(pl => p.playerId === pl.id));
   const win = members[0].win;
+  const leagueOfGraphsLink = `https://www.leagueofgraphs.com/de/match/euw/${match.id}`;
   await discord.sendMessage({
     message: formatTitle1(),
     title: formatTitle2(match, members, win),
     body: formatMembersStatus(match, members),
     color: win ? discord.Color.green : discord.Color.red,
+    url: leagueOfGraphsLink,
   });
 }
 
@@ -72,16 +74,15 @@ function formatNames(names: string[]) {
 function formatMembersStatus(match: league.Match, members: league.MatchParticipant[]) {
   const time = match.time;
   const duration = Math.round(match.duration / 60);
-  const leaugeOfGraphsLink = `https://www.leagueofgraphs.com/de/match/euw/${match.id}`;
-  return `${leaugeOfGraphsLink}\n\nDate: ${time}\nDuration: ${duration}min\n\n${members.map(formatMemberStats).join('\n\n')}`;
+  return `Date: ${time}\nDuration: ${duration}min\n\n${members.map(formatMemberStats).join('\n\n')}`;
 }
 
 function formatMemberStats(participant: league.MatchParticipant) {
   return `**${participant.summonerName}**
   Position: ${participant.position}
   Champion: ${participant.champion}
-  KDA:      ${participant.kills}/${participant.deaths}/${participant.assists}
-  CS:       ${participant.cs}`;
+  KDA: ${participant.kills}/${participant.deaths}/${participant.assists}
+  CS: ${participant.cs}`;
 }
 
 function checkMatchesLoop() {

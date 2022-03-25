@@ -36,14 +36,16 @@ export namespace discord {
     message: string,
     title: string,
     body: string,
-    color: Color
+    color: Color,
+    url: string,
   }
 
   export async function sendMessage(message: DiscordMessage) {
     const embed = new Discord.MessageEmbed()
       .setTitle(message.title)
       .setDescription(message.body)
-      .setColor(message.color);
+      .setColor(message.color)
+      .setURL(message.url);
 
     await webhookClient.send({
       content: message.title,
