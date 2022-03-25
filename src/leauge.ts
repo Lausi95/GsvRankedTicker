@@ -22,7 +22,7 @@ export namespace league {
   export const QUEUE_TYPES: QueueType[] = [
     {
       id: 420,
-      name: 'Ranked',
+      name: 'Solo/Duo',
       isRanked: true,
     },
     {

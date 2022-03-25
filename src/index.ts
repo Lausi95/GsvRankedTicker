@@ -58,7 +58,7 @@ function formatTitle1() {
 
 function formatTitle2(match: league.Match, members: league.MatchParticipant[], win: boolean) {
   const names = formatNames(members.map(m => m.summonerName));
-  return names + ' just played a ranked ' + match.queue.name
+  return names + ' just played a ' + match.queue.name
     + ', and ' + (members.length > 1 ? 'they ' : 'he ')
     + (win ? `won! ${discord.Emotes.pog}` : `lost ${discord.Emotes.sadge}`);
 }
