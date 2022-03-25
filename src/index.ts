@@ -72,7 +72,8 @@ function formatNames(names: string[]) {
 function formatMembersStatus(match: league.Match, members: league.MatchParticipant[]) {
   const time = match.time;
   const duration = Math.round(match.duration / 60);
-  return `Date: ${time}\nDuration: ${duration}min\n\n${members.map(formatMemberStats).join('\n\n')}`;
+  const leaugeOfGraphsLink = `https://www.leagueofgraphs.com/de/match/euw/${match.id}`;
+  return `${leaugeOfGraphsLink}\n\nDate: ${time}\nDuration: ${duration}min\n\n${members.map(formatMemberStats).join('\n\n')}`;
 }
 
 function formatMemberStats(participant: league.MatchParticipant) {
